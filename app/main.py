@@ -9,11 +9,14 @@ from pydantic import BaseModel, Field
 
 from app.math_engine import MathInputError, Verification, verify_equation
 from app.agents.workflow import run_mock_learning_cycle
-from app.agents.groq_workflow import ProviderUnavailable, run_groq_learning_cycle, generate_adaptive_step_hint, review_transfer_explanation
-from app.transfer import TRANSFER_PROBLEMS, check_transfer
+from app.agents.groq_workflow import ProviderUnavailable, run_groq_learning_cycle
 from app.agents.coach import run_coach
-from app.step_tutor import check_step
-from app.concept_check import check_concept, get_concept_question
+from app.learning.orchestrator import evaluate_step, evaluate_concept, evaluate_transfer
+from app.learning.subjects import get_subject, list_subjects
+from app.learning.session import create_session, get_session, record_evidence
+from app.learning.biology import TOPIC_ID
+from app.learning.conversation import (start_conversation, get_conversation, send_message,
+                                       link_learning_session, sync_learning_evidence)
 
 app = FastAPI(title="MethodMind", version="0.1.0")
 WEB_DIR = Path(__file__).resolve().parent / "static"
@@ -28,6 +31,122 @@ def home() -> FileResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "project": "MethodMind", "phase": "scaffold"}
+
+
+@app.get("/learning/subjects")
+def learning_subjects() -> dict:
+    """Discover currently supported specialist subjects."""
+    return {"subjects": list_subjects(), "default_subject": "algebra"}
+
+
+@app.post("/conversation/start")
+def conversation_start() -> dict:
+    return start_conversation()
+
+
+class ConversationMessageRequest(BaseModel):
+    conversation_id: str = Field(min_length=1, max_length=64)
+    message: str = Field(min_length=1, max_length=1500)
+
+
+@app.post("/conversation/message")
+def conversation_message(request: ConversationMessageRequest) -> dict:
+    try:
+        return send_message(request.conversation_id, request.message)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/conversation/{conversation_id}")
+def conversation_status(conversation_id: str) -> dict:
+    try:
+        return get_conversation(conversation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+class ConversationLinkRequest(BaseModel):
+    conversation_id: str = Field(min_length=1, max_length=64)
+    learning_session_id: str = Field(min_length=1, max_length=64)
+
+
+@app.post("/conversation/link-session")
+def conversation_link_session(request: ConversationLinkRequest) -> dict:
+    try:
+        return link_learning_session(request.conversation_id, request.learning_session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class ConversationSyncRequest(BaseModel):
+    conversation_id: str = Field(min_length=1, max_length=64)
+
+
+@app.post("/conversation/sync-evidence")
+def conversation_sync_evidence(request: ConversationSyncRequest) -> dict:
+    try:
+        return sync_learning_evidence(request.conversation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class SessionStartRequest(BaseModel):
+    subject: str = Field(default="algebra", max_length=40)
+    problem: str = Field(min_length=3, max_length=241)
+
+
+@app.post("/learning/session")
+def learning_session_start(request: SessionStartRequest) -> dict:
+    try:
+        return create_session(request.subject, request.problem)
+    except (MathInputError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/learning/session/{session_id}")
+def learning_session_status(session_id: str) -> dict:
+    try:
+        return get_session(session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/learning/biology/activity/{activity}/{stage}")
+def biology_activity(activity: str, stage: int) -> dict:
+    try:
+        return get_subject("biology").generate_activity(activity, stage)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class BiologyCheckRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=64)
+    activity: str = Field(pattern="^(guided_practice|concept_check|transfer)$")
+    stage: int = Field(ge=0, le=2)
+    choice: int = Field(ge=0, le=2)
+    reasoning: str = Field(default="", max_length=1000)
+    attempt_number: int = Field(default=1, ge=1, le=20)
+
+
+@app.post("/learning/biology/check")
+def biology_check(request: BiologyCheckRequest) -> dict:
+    try:
+        result = get_subject("biology").evaluate_response(
+            request.activity, stage=request.stage, choice=request.choice,
+            reasoning=request.reasoning, attempt_number=request.attempt_number)
+        result["learning_session"] = record_evidence(
+            request.session_id, "biology", request.activity, request.stage, result, TOPIC_ID)
+        return result
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 class MathVerificationRequest(BaseModel):
@@ -80,6 +199,7 @@ class TransferRequest(BaseModel):
     proposed_answer: str = Field(min_length=1, max_length=120)
     reasoning: str = Field(default="", max_length=1000)
     coaching_mode: str = Field(default="coach", pattern="^(coach|groq)$")
+    session_id: str | None = Field(default=None, max_length=64)
 
 
 class StepRequest(BaseModel):
@@ -88,69 +208,51 @@ class StepRequest(BaseModel):
     submitted_equation: str = Field(min_length=3, max_length=241)
     coaching_mode: str = Field(default="coach", pattern="^(coach|groq)$")
     attempt_number: int = Field(default=1, ge=1, le=20)
+    session_id: str | None = Field(default=None, max_length=64)
 
 
 @app.post("/learning/step")
 def learning_step(request: StepRequest) -> dict:
     try:
-        response = check_step(request.equation, request.stage, request.submitted_equation,
-                              request.attempt_number)
-        response["hint_source"] = "symbolic" if not response["correct"] else None
-        if (not response["correct"] and request.coaching_mode == "groq" and
-                response["support_level"] == 1):
-            try:
-                response["hint"] = generate_adaptive_step_hint(
-                    request.equation, request.stage, request.submitted_equation,
-                    response["feedback"], response["hint"],
-                )
-                response["hint_source"] = "live_ai"
-            except ProviderUnavailable:
-                # Never break tutoring because the model is overloaded or unavailable.
-                response["hint_source"] = "symbolic_fallback"
-        elif not response["correct"] and request.coaching_mode == "groq":
-            # Repeated attempts use verified scaffolding, without extra paid AI calls.
-            response["hint_source"] = "adaptive_scaffold"
+        response = evaluate_step("algebra", request.equation, request.stage,
+                                 request.submitted_equation, request.coaching_mode,
+                                 request.attempt_number)
+        if request.session_id:
+            response["learning_session"] = record_evidence(
+                request.session_id, "algebra", "guided_practice", request.stage,
+                response, request.equation)
         return response
-    except MathInputError as exc:
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (MathInputError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/learning/transfer")
 def learning_transfer(request: TransferRequest) -> dict:
     try:
-        result = check_transfer(request.stage, request.proposed_answer, request.reasoning)
-        result["review_source"] = "offline_rubric"
-        if result["answer_correct"] and request.coaching_mode == "groq" and request.reasoning.strip():
-            try:
-                review = review_transfer_explanation(TRANSFER_PROBLEMS[request.stage]["equation"], request.reasoning)
-                result["review_source"] = "groq_with_local_guard"
-                # The model can request more explanation, but cannot bypass local checks.
-                if review["status"] != "supported":
-                    result["correct"] = False
-                    result["practice_complete"] = False
-                    result["next_stage"] = None
-                    result["next_question"] = None
-                    result["reasoning_status"] = review["status"]
-                if result["correct"] or review["status"] != "supported":
-                    result["feedback"] = "Your value satisfies the equation. " + review["feedback"]
-                else:
-                    result["feedback"] += " The AI also found the explanation plausible, but more explicit reasoning is needed for this checkpoint."
-            except ProviderUnavailable:
-                result["review_source"] = "offline_fallback"
-        return result
-    except MathInputError as exc:
+        response = evaluate_transfer("algebra", request.stage, request.proposed_answer,
+                                     request.reasoning, request.coaching_mode)
+        if request.session_id:
+            response["learning_session"] = record_evidence(
+                request.session_id, "algebra", "transfer", request.stage, response)
+        return response
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (MathInputError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 class ConceptRequest(BaseModel):
     stage: int = Field(ge=0, le=1)
     choice: int = Field(ge=0, le=2)
+    session_id: str | None = Field(default=None, max_length=64)
 
 
 @app.get("/learning/concept/{stage}")
 def learning_concept_question(stage: int) -> dict:
     try:
-        return get_concept_question(stage)
+        return get_subject("algebra").generate_activity("concept_check", stage)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -158,6 +260,12 @@ def learning_concept_question(stage: int) -> dict:
 @app.post("/learning/concept")
 def learning_concept_check(request: ConceptRequest) -> dict:
     try:
-        return check_concept(request.stage, request.choice)
+        response = evaluate_concept("algebra", request.stage, request.choice)
+        if request.session_id:
+            response["learning_session"] = record_evidence(
+                request.session_id, "algebra", "concept_check", request.stage, response)
+        return response
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

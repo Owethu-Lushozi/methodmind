@@ -7,6 +7,7 @@
   <title>MethodMind · Learn the method, not just the answer</title>
   <link rel="stylesheet" href="/static/style.css" />
   <script src="/static/app.js" defer></script>
+  <script src="/static/conversation.js" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -25,9 +26,24 @@
         <h1>Let's understand <em>how.</em></h1>
         <p class="intro">Don't just solve this question. Learn the thinking that helps you solve the next one, too.</p>
 
+        <section class="conversation-card" aria-label="Talk to MethodMind">
+          <div class="conversation-title"><span class="conversation-avatar">✦</span><div><h2>Talk to your learning colleague</h2><p>Tell me what you're studying, or where you feel stuck.</p></div><span class="conversation-label">NEW · CONVERSATION</span></div>
+          <div id="conversation-messages" class="conversation-messages" role="log" aria-live="polite" aria-label="Conversation messages"></div>
+          <div id="conversation-suggestions" class="conversation-suggestions" aria-label="Suggested replies"></div>
+          <div id="conversation-practice" class="conversation-practice" aria-label="Checked learning activities"></div>
+          <form id="conversation-form" class="conversation-form">
+            <label for="conversation-input" class="visually-hidden">Message your learning colleague</label>
+            <input id="conversation-input" name="message" placeholder="e.g. I'm struggling with integration by substitution…" maxlength="1500" required autocomplete="off" />
+            <button type="submit" id="conversation-send" class="conversation-send">Send →</button>
+          </form>
+          <div id="conversation-status" class="conversation-status" role="status">Chat helps explore ideas. Supported checked activities can be opened below.</div>
+        </section>
+
         <div class="layout">
           <section class="card ask-card">
             <div class="card-title"><span class="number">01</span><div><h2>Bring your problem</h2><p>Type any supported linear equation. No camera needed.</p></div></div>
+            <label for="subject-select">CHOOSE A SUBJECT</label>
+            <select id="subject-select" class="subject-select"><option value="algebra">Mathematics · Linear equations</option><option value="biology">Life Sciences · Photosynthesis</option></select>
             <form id="learning-form">
               <label for="equation">THE QUESTION</label>
               <input id="equation" name="equation" required maxlength="241" value="3(x-2)+5=17" spellcheck="false" placeholder="e.g. 3(x-2)+5=17" />
@@ -38,6 +54,12 @@
               <button class="primary" type="submit" id="submit">Explore my method <span>→</span></button>
               <p class="mode-hint" id="mode-hint">Guided coaching generates checked algebra steps and responds to the answer you entered. It does not call an LLM.</p>
             </form>
+            <div id="biology-intro" hidden>
+              <h3>Photosynthesis: what limits the rate?</h3>
+              <p>Explore why changing light or carbon dioxide can increase photosynthesis—and why the increase may eventually level off. Practice explaining the evidence, not just selecting an answer.</p>
+              <button type="button" class="primary" id="biology-start">Start Life Sciences pathway →</button>
+              <p class="mode-hint">Curated Life Sciences coaching works offline. This module checks specific explanations, not every biology question.</p>
+            </div>
           </section>
 
           <section class="card response-card" aria-live="polite">
@@ -45,6 +67,7 @@
             <div id="empty" class="empty"><div class="empty-icon">✳</div><h3>Your next breakthrough starts here.</h3><p>Share a problem and your attempt. Your learning colleague will meet you where you are.</p></div>
             <div id="result" hidden>
               <div class="result-head"><span id="result-badge" class="result-badge">VERIFIED</span><span id="model-badge" class="model-badge">DEMO MODE</span></div>
+              <p id="learning-memory" role="status" aria-live="polite" hidden></p>
               <div class="result-section"><div class="result-label">◉ &nbsp; WHAT WE'RE WORKING ON</div><p id="diagnosis"></p></div>
               <div class="result-section teaching"><div class="result-label">✦ &nbsp; LET'S THINK IT THROUGH</div><p id="explanation"></p></div>
               <div id="steps-wrap" class="steps-wrap" hidden>
@@ -81,6 +104,25 @@
               </div>
               <details class="agent-log"><summary>Behind the scenes <span id="event-count">0</span> agent actions</summary><ol id="events"></ol></details>
               <p class="disclaimer" id="disclaimer"></p>
+            </div>
+            <div id="biology-result" hidden>
+              <div class="result-head"><span class="result-badge">✓ CURATED CONCEPT CHECK</span><span class="model-badge">LIFE SCIENCES</span></div>
+              <p id="biology-memory" role="status"></p>
+              <div class="result-section teaching"><div class="result-label">✦ &nbsp; LEARN THE WHY</div><p id="biology-teaching">One factor can limit photosynthesis even when other requirements are abundant. We will examine the evidence together.</p></div>
+              <div class="steps-wrap">
+                <div class="result-label">◎ &nbsp; YOUR TURN: REASON THROUGH A SCENARIO</div>
+                <p id="biology-progress"></p>
+                <p id="biology-question"></p>
+                <form id="biology-form">
+                  <div id="biology-choices" class="concept-options" role="group" aria-label="Life Sciences answers"></div>
+                  <label id="biology-reasoning-label" for="biology-reasoning" hidden>Explain your reasoning (required)</label>
+                  <textarea id="biology-reasoning" rows="3" maxlength="1000" placeholder="Name the limiting factor and explain the evidence." hidden></textarea>
+                  <button type="submit" class="check-button" id="biology-check">Check my thinking →</button>
+                </form>
+                <div id="biology-feedback" class="transfer-feedback" role="status" hidden></div>
+                <button type="button" class="next-button" id="biology-next" hidden>Continue →</button>
+              </div>
+              <p class="disclaimer">Responses are checked against curated explanations; this is evidence of understanding, not proof of mastery.</p>
             </div>
           </section>
         </div>
