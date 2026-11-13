@@ -7,6 +7,79 @@ const result = document.querySelector('#result');
 const set = (id, value) => { document.getElementById(id).textContent = value ?? 'Not available'; };
 let transferStage = 0;
 let pendingNextStage = null;
+let tutorStage = 0;
+let tutorNextStage = null;
+let activeEquation = '';
+
+function resetTutor(equation, enabled) {
+  activeEquation = equation;
+  tutorStage = 0;
+  tutorNextStage = null;
+  document.querySelector('#steps-wrap').hidden = !enabled;
+  document.querySelector('#step-form').hidden = false;
+  document.querySelector('#step-feedback').hidden = true;
+  document.querySelector('#step-next').hidden = true;
+  document.querySelector('#step-equation').value = '';
+  document.querySelector('#revealed-steps').replaceChildren();
+  set('step-prompt', 'Step 1 of 3: Expand brackets and combine like terms. Write the simplified equation.');
+}
+
+document.querySelector('#step-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = document.querySelector('#step-check');
+  const feedback = document.querySelector('#step-feedback');
+  button.disabled = true;
+  button.textContent = 'Checking step…';
+  try {
+    const response = await fetch('/learning/step', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({equation: activeEquation, stage: tutorStage, submitted_equation: document.querySelector('#step-equation').value}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Could not check your step.');
+    feedback.hidden = false;
+    feedback.textContent = data.feedback + (data.hint ? `\nHint: ${data.hint}` : '');
+    tutorNextStage = data.next_stage;
+    if (data.correct) {
+      const list = document.querySelector('#revealed-steps');
+      const item = document.createElement('li');
+      const equation = document.createElement('strong');
+      equation.textContent = data.revealed_step;
+      const explanation = document.createElement('small');
+      explanation.textContent = data.step_reason;
+      item.append(equation, explanation);
+      list.appendChild(item);
+      document.querySelector('#step-form').hidden = true;
+      if (data.complete) {
+        feedback.textContent += '\nAll three steps checked. Now try transferring the method to a different question.';
+        if (data.final_check) feedback.textContent += `\n${data.final_check}`;
+        document.querySelector('#transfer-wrap').hidden = false;
+      } else {
+        const next = document.querySelector('#step-next');
+        next.hidden = false;
+        next.dataset.prompt = data.next_prompt;
+      }
+    }
+  } catch (error) {
+    feedback.hidden = false;
+    feedback.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Check this step →';
+  }
+});
+
+document.querySelector('#step-next').addEventListener('click', (event) => {
+  if (tutorNextStage === null) return;
+  tutorStage = tutorNextStage;
+  tutorNextStage = null;
+  set('step-prompt', event.currentTarget.dataset.prompt);
+  document.querySelector('#step-form').hidden = false;
+  document.querySelector('#step-equation').value = '';
+  document.querySelector('#step-feedback').hidden = true;
+  event.currentTarget.hidden = true;
+  document.querySelector('#step-equation').focus();
+});
 
 function resetTransfer() {
   transferStage = 0;
@@ -101,13 +174,15 @@ form.addEventListener('submit', async (event) => {
     empty.hidden = true;
     result.hidden = false;
     const badge = document.querySelector('#result-badge');
-    badge.textContent = data.status === 'verified' ? '✓ VERIFIED ANSWER' : (data.status || 'NEEDS INPUT').toUpperCase();
+    badge.textContent = data.status === 'verified' ? (data.mode === 'rule_based' ? '✓ PROBLEM CHECKED' : '✓ VERIFIED ANSWER') : (data.status || 'NEEDS INPUT').toUpperCase();
     badge.style.background = data.status === 'verified' ? '#e7f6ef' : '#fff2dc';
     badge.style.color = data.status === 'verified' ? '#22896a' : '#986524';
     set('model-badge', data.mode === 'mock' ? 'SIMULATED DEMO' : data.mode === 'rule_based' ? 'OFFLINE COACH' : 'LIVE GEMINI');
     set('diagnosis', data.diagnosis || data.question || 'We need a little more of your thinking to get started.');
     set('explanation', data.explanation || 'No verified explanation is available yet.');
-    document.querySelector('#transfer-wrap').hidden = !data.transfer_question;
+    const coaching = data.mode === 'rule_based' && data.status === 'verified';
+    resetTutor(document.querySelector('#equation').value.trim(), coaching);
+    document.querySelector('#transfer-wrap').hidden = !data.transfer_question || coaching;
     if (data.transfer_question) { set('transfer', data.transfer_question); resetTransfer(); }
     set('disclaimer', data.disclaimer || '');
     const events = document.querySelector('#events');
@@ -128,6 +203,7 @@ form.addEventListener('submit', async (event) => {
     set('diagnosis', error.message);
     set('explanation', selectedMode === 'run' ? 'Gemini may be busy. Switch to Guided demo to explore the workflow without relying on Google.' : 'Check that your FastAPI server is running and your equation is supported.');
     document.querySelector('#transfer-wrap').hidden = true;
+    document.querySelector('#steps-wrap').hidden = true;
     document.querySelector('#events').replaceChildren();
     set('event-count', '0');
     set('disclaimer', 'No verified result was produced.');

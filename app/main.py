@@ -12,6 +12,7 @@ from app.agents.workflow import run_mock_learning_cycle
 from app.agents.gemini_workflow import ProviderUnavailable, run_gemini_learning_cycle
 from app.transfer import check_transfer
 from app.agents.coach import run_coach
+from app.step_tutor import check_step
 
 app = FastAPI(title="MethodMind", version="0.1.0")
 WEB_DIR = Path(__file__).resolve().parent / "static"
@@ -77,6 +78,20 @@ class TransferRequest(BaseModel):
     stage: int = Field(ge=0, le=1)
     proposed_answer: str = Field(min_length=1, max_length=120)
     reasoning: str = Field(default="", max_length=1000)
+
+
+class StepRequest(BaseModel):
+    equation: str = Field(min_length=3, max_length=241)
+    stage: int = Field(ge=0, le=2)
+    submitted_equation: str = Field(min_length=3, max_length=241)
+
+
+@app.post("/learning/step")
+def learning_step(request: StepRequest) -> dict:
+    try:
+        return check_step(request.equation, request.stage, request.submitted_equation)
+    except MathInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/learning/transfer")

@@ -47,6 +47,14 @@
               <div class="result-head"><span id="result-badge" class="result-badge">VERIFIED</span><span id="model-badge" class="model-badge">DEMO MODE</span></div>
               <div class="result-section"><div class="result-label">◉ &nbsp; WHAT WE'RE WORKING ON</div><p id="diagnosis"></p></div>
               <div class="result-section teaching"><div class="result-label">✦ &nbsp; LET'S THINK IT THROUGH</div><p id="explanation"></p></div>
+              <div id="steps-wrap" class="steps-wrap" hidden>
+                <div class="result-label">◎ &nbsp; YOUR TURN: SHOW THE STEPS</div>
+                <ol id="revealed-steps" class="revealed-steps"></ol>
+                <p id="step-prompt">Step 1 of 3: Expand brackets and combine like terms. Write the simplified equation.</p>
+                <form id="step-form"><label for="step-equation">Your equation for this step</label><input id="step-equation" required maxlength="241" placeholder="Write your equation using x and =" autocomplete="off" /><button type="submit" id="step-check" class="check-button">Check this step →</button></form>
+                <div id="step-feedback" class="transfer-feedback" hidden role="status"></div>
+                <button id="step-next" class="next-button" type="button" hidden>Continue to next step →</button>
+              </div>
               <div id="transfer-wrap" class="transfer">
                 <div class="result-label">↗ &nbsp; TRY TRANSFERRING THE METHOD</div><p id="transfer"></p>
                 <small>Can you solve this one without copying the steps?</small>

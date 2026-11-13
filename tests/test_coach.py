@@ -11,8 +11,9 @@ def coach(equation, attempt):
 def test_symbolic_steps_and_transfer_question():
     data = coach('3(x-2)+5=17', 'I tried x=5').json()
     assert data['status'] == 'verified'
-    assert data['verified_answer'] == '6'
-    assert '3*x = 18' in data['explanation']
+    assert data['verified_answer'] is None
+    assert 'x = 6' not in data['explanation']
+    assert 'simplifying' in data['explanation']
     assert data['transfer_question'] == '4(x-1)+2=18'
 
 
