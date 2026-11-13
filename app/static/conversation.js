@@ -64,8 +64,9 @@
       const button = document.createElement('button');
       button.type = 'button'; button.textContent = choice;
       button.addEventListener('click', () => {
+        if (sendButton.disabled) return;
         input.value = choice;
-        input.focus();
+        form.requestSubmit();
       });
       suggestions.appendChild(button);
     });

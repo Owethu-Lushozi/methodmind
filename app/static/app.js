@@ -155,6 +155,7 @@ document.querySelector('#step-form').addEventListener('submit', async (event) =>
         : 'SymPy feedback remains available while Groq is unavailable.'));
       events.appendChild(item);
       set('event-count', String(events.children.length));
+      renderAgentTimelineFromLog();
     }
     tutorNextStage = data.next_stage;
     if (data.correct) {
@@ -341,6 +342,7 @@ form.addEventListener('submit', async (event) => {
       events.appendChild(li);
     }
     set('event-count', String((data.events || []).length));
+    renderAgentTimeline(data.events || []);
   } catch (error) {
     learningSessionId = null;
     document.querySelector('#learning-memory').hidden = true;
@@ -349,12 +351,23 @@ form.addEventListener('submit', async (event) => {
     set('result-badge', 'NOT AVAILABLE');
     set('model-badge', selectedMode === 'controlled' ? 'CONTROLLED LIVE DEMO' : selectedMode === 'run' ? 'LIVE GROQ' : selectedMode === 'coach' ? 'OFFLINE COACH' : 'SIMULATED DEMO');
     set('diagnosis', error.message);
-    set('explanation', selectedMode === 'run' ? 'Groq may be busy or rate-limited. Switch to Guided coaching · offline to keep learning.' : 'Check that your FastAPI server is running and your equation is supported.');
+    const message = String(error.message || '');
+    const invalidInput = /exactly one equals|only linear|unsupported|use numbers|syntax|equation|division by|expression is empty/i.test(message)
+      && !/authentication|api.key|rate.limit|groq|provider|unavailable|network/i.test(message);
+    const authentication = /authentication|invalid.api.key|api.key|401|unauthorized/i.test(message);
+    set('explanation', invalidInput
+      ? 'This checked workspace supports one-variable linear equations in x. Correct the input, or return to Mindy to discuss a different maths topic conversationally.'
+      : authentication
+      ? 'Groq authentication failed. Check your server-side API key, or switch to Guided coaching · offline.'
+      : ['run', 'controlled'].includes(selectedMode)
+      ? 'The live AI service is unavailable. You can switch to Guided coaching · offline and try again later.'
+      : 'Check that your FastAPI server is running and your equation is supported.');
     document.querySelector('#transfer-wrap').hidden = true;
     document.querySelector('#concept-wrap').hidden = true;
     document.querySelector('#steps-wrap').hidden = true;
     document.querySelector('#events').replaceChildren();
     set('event-count', '0');
+    renderAgentTimeline([]);
     set('disclaimer', 'No verified result was produced.');
   } finally {
     submit.disabled = false;
@@ -489,3 +502,73 @@ document.querySelector('#biology-next').addEventListener('click', async () => {
     feedback.hidden = false; feedback.textContent = error.message;
   }
 });
+
+
+// Presentation-only rendering of existing events. Does not affect any verification logic.
+function agentPresentation(event) {
+  const agent = String(event.agent || '').toLowerCase();
+  const action = String(event.action || '').toLowerCase();
+  const detail = String(event.detail || '');
+  if (action.includes('inject_known_error')) return ['injected','Controlled error introduced','Deliberately injected test fault — not a spontaneous AI error.'];
+  if (action.includes('request_revision')) return ['revision','Correction requested','Orchestrator asks the teaching agent to revise the rejected step.'];
+  if (action.includes('correction_verified')) return ['verified','Correction independently verified','The revised step passed the symbolic review.'];
+  if (action.includes('sympy_verify') && /valid=false/i.test(detail)) return ['rejected','Symbolic check rejected the step','The proposed transformation failed independent verification.'];
+  if (action.includes('sympy_verify') && /valid=true/i.test(detail)) return ['verified','Symbolic check accepted the step','The proposed transformation passed independent verification.'];
+  if (action.includes('check_student_answer')) return ['review','Student attempt checked','Reviewer checks the submitted answer against the equation.'];
+  if (agent.includes('diagnostic')) return ['ai','Diagnostic agent','Groq examines the student’s difficulty.'];
+  if (agent.includes('teaching_reviser')) return ['ai','Teaching agent revises','Groq generates a new proposed step.'];
+  if (agent.includes('teaching')) return ['ai','Teaching agent','Groq prepares learning guidance.'];
+  return ['review',`${event.agent || 'Agent'} · ${event.action || 'action'}`,detail];
+}
+function renderAgentTimeline(events) {
+  const timeline = document.querySelector('#agent-timeline');
+  if (!timeline) return;
+  timeline.replaceChildren();
+  if (!events.length) {
+    const empty = document.createElement('p');
+    empty.className = 'agent-timeline-empty';
+    empty.textContent = 'Agent decisions will appear here when you start a checked activity.';
+    timeline.appendChild(empty);
+    return;
+  }
+  events.forEach((event, index) => {
+    const [kind, title, summary] = agentPresentation(event);
+    const row = document.createElement('div');
+    row.className = `agent-event agent-event--${kind}`;
+    const marker = document.createElement('span');
+    marker.className = 'agent-event-marker';
+    marker.textContent = String(index + 1);
+    const content = document.createElement('div');
+    content.className = 'agent-event-body';
+    const header = document.createElement('div');
+    header.className = 'agent-event-header';
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const tag = document.createElement('span');
+    tag.className = 'agent-event-tag';
+    tag.textContent = ({injected:'INJECTED',rejected:'REJECTED',verified:'VERIFIED',revision:'REVISION',ai:'LIVE AI',review:'REVIEW'})[kind];
+    header.append(heading, tag);
+    const description = document.createElement('p');
+    description.textContent = summary;
+    content.append(header, description);
+    if (kind === 'rejected' || kind === 'verified' || kind === 'injected') {
+      const proposed = String(event.detail || '').match(/(?:proposed=|with )([^;,.]+?=[^;,.]+?)(?:;|\.|$)/i);
+      if (proposed) {
+        const formula = document.createElement('div');
+        formula.className = 'agent-event-equation';
+        formula.textContent = proposed[1];
+        content.appendChild(formula);
+      }
+    }
+    row.append(marker, content);
+    timeline.appendChild(row);
+  });
+}
+function renderAgentTimelineFromLog() {
+  const entries = [...document.querySelectorAll('#events li')].map(li => {
+    const heading = li.querySelector('strong')?.textContent || '';
+    const parts = heading.replace(/:\s*$/, '').split(' · ');
+    return {agent:parts[0] || 'reviewer', action:parts[1] || 'update', detail:li.textContent.slice(heading.length)};
+  });
+  renderAgentTimeline(entries);
+}

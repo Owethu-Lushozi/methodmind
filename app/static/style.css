@@ -55,3 +55,53 @@ body:not(.workspace-mode) #activity-layout{display:none}body.workspace-mode #act
 .learning-focused {gap:12px;}
 .learning-focused .response-card {scroll-margin-top:20px;}
 @media(max-width:650px){.learning-focus-bar{align-items:flex-start;flex-direction:column;}}
+
+/* Judges' presentation view: a visual layer over the original agent log. */
+.agent-visual{border-top:1px solid var(--border);padding:24px 0 14px;margin-top:12px}
+.agent-visual-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+.agent-visual-head h3{font-size:19px;margin:4px 0;color:var(--ink)}
+.agent-visual-head p{margin:0;font-size:12px;line-height:1.5;color:var(--muted)}
+.agent-visual-eyebrow{font-size:10px;font-weight:800;letter-spacing:1.1px;color:var(--violet)}
+.agent-visual-count{flex-shrink:0;background:#f1edff;color:#6e51cb;padding:9px 12px;border-radius:100px;font-weight:800;font-size:11px}
+.agent-timeline{display:grid;gap:0;padding-left:4px}
+.agent-event{display:grid;grid-template-columns:35px minmax(0,1fr);gap:12px;position:relative;padding-bottom:12px}
+.agent-event:not(:last-child):before{content:'';position:absolute;left:16px;top:32px;bottom:-2px;width:2px;background:#e7e1f6}
+.agent-event-marker{position:relative;z-index:1;display:grid;place-items:center;width:33px;height:33px;border-radius:50%;background:#eee9fc;color:#6e51cb;font-size:12px;font-weight:800;border:2px solid #fff;box-shadow:0 0 0 1px #e7defc}
+.agent-event-body{padding:13px 16px;background:#f8f6ff;border:1px solid #e8e1f9;border-radius:13px;min-width:0}
+.agent-event-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.agent-event-header strong{font-size:13px;color:#352654}
+.agent-event-tag{font-size:9px;font-weight:800;letter-spacing:.6px;border-radius:30px;background:#eae3ff;color:#7052ca;padding:5px 8px}
+.agent-event-body p{margin:7px 0 0;font-size:12px;line-height:1.55;color:#5f6078;overflow-wrap:anywhere}
+.agent-event-equation{display:inline-block;margin-top:9px;padding:8px 12px;border-radius:8px;background:#fff;font:700 17px Outfit,Arial,sans-serif;color:#2d2547;border:1px solid #e5dff0}
+.agent-event--rejected .agent-event-body,.agent-event--injected .agent-event-body{background:#fff5f4;border-color:#f1d5d0}
+.agent-event--rejected .agent-event-marker,.agent-event--injected .agent-event-marker{background:#ffdfd9;color:#b04435;box-shadow:0 0 0 1px #f1d5d0}
+.agent-event--rejected .agent-event-tag,.agent-event--injected .agent-event-tag{background:#ffe0db;color:#a4382d}
+.agent-event--verified .agent-event-body{background:#eefaf3;border-color:#cbe9d8}
+.agent-event--verified .agent-event-marker{background:#d8f5e4;color:#168258;box-shadow:0 0 0 1px #cbe9d8}
+.agent-event--verified .agent-event-tag{background:#d7f4e3;color:#17764f}
+.agent-timeline-empty{padding:18px;background:#f8f6ff;border-radius:12px;color:var(--muted);font-size:12px}
+.agent-visual .agent-log{padding:14px 0 0;margin-top:6px;cursor:default}
+.agent-visual .agent-log summary{cursor:pointer;color:var(--violet);font-size:12px}
+.agent-visual .agent-log li{font-size:11px}
+@media(max-width:650px){.agent-visual-head{align-items:flex-start}.agent-event{gap:7px}.agent-event-body{padding:11px}.agent-event-header strong{font-size:12px}}
+
+/* Final presentation polish: visual changes only; existing activity logic stays intact. */
+#subject-select[hidden]{display:none!important}
+.subject-static{display:flex;align-items:center;gap:13px;padding:15px 17px;margin:22px 0 20px;border:1px solid var(--border);background:var(--soft);border-radius:15px}
+.subject-static-icon{display:grid;place-items:center;width:43px;height:43px;flex-shrink:0;border-radius:12px;background:var(--violet);color:#fff;font-size:24px;font-weight:700}
+.subject-static>div{display:grid;gap:4px;min-width:0}.subject-static-label{font-size:10px;font-weight:800;letter-spacing:1.4px;color:var(--muted)}.subject-static strong{font-size:15px;color:var(--ink)}
+.subject-static-check{margin-left:auto;display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#d9f7e6;color:#177d54;font-weight:800}
+.workspace-toolbar{background:linear-gradient(115deg,var(--surface) 5%,var(--soft) 100%);border:1px solid var(--border);border-radius:19px;padding:18px 22px;margin-bottom:23px;box-shadow:0 10px 26px #25123908}
+.workspace-heading{display:flex;align-items:center;gap:15px}.workspace-heading-icon{width:49px;height:49px;border-radius:15px;background:var(--violet);color:#fff;display:grid;place-items:center;font-size:27px;flex-shrink:0;box-shadow:0 6px 16px #7856e82b}
+.workspace-toolbar .workspace-heading strong{font-size:23px;line-height:1.2;margin:3px 0}.workspace-toolbar .workspace-kicker{font-size:10px;letter-spacing:1.5px;font-weight:800;color:var(--violet);margin:0}
+.workspace-toolbar>button{font-weight:700;white-space:nowrap}.workspace-toolbar>button:hover{border-color:var(--violet);color:var(--violet)}
+body:not(.workspace-mode) .workspace-main>.welcome-mascot{position:relative;z-index:1}
+body:not(.workspace-mode) .workspace-main{position:relative}
+body:not(.workspace-mode) .workspace-main:before{content:'';position:absolute;right:1%;top:0;width:min(39%,420px);height:225px;border-radius:38% 62% 55% 45%;background:radial-gradient(ellipse at 35% 30%,#d7c8ffb5,transparent 65%),radial-gradient(ellipse at 75% 70%,#c8f36a7a,transparent 60%);filter:blur(3px);pointer-events:none;opacity:.85}
+body:not(.workspace-mode) .workspace-main:after{content:'✦';position:absolute;right:12%;top:65px;font-size:54px;color:var(--violet);opacity:.27;pointer-events:none}
+body:not(.workspace-mode) .workspace-main>.eyebrow,body:not(.workspace-mode) .workspace-main>h1,body:not(.workspace-mode) .workspace-main>.intro{position:relative;z-index:1}
+body:not(.workspace-mode) .workspace-main>h1{max-width:900px;line-height:1.12;letter-spacing:-1.2px}
+body:not(.workspace-mode) .workspace-main>.intro{max-width:720px;line-height:1.6}
+body:not(.workspace-mode) .conversation-card{margin-top:30px}
+@media(max-width:850px){body:not(.workspace-mode) .workspace-main:before{width:35%;opacity:.45}.workspace-toolbar{padding:15px}.workspace-toolbar .workspace-heading strong{font-size:19px}}
+@media(max-width:550px){body:not(.workspace-mode) .workspace-main:after{display:none}.workspace-heading-icon{width:38px;height:38px;font-size:20px}.workspace-toolbar{gap:10px}.workspace-toolbar .workspace-kicker{font-size:8px}.workspace-toolbar>button{padding:8px;font-size:11px}.subject-static strong{font-size:13px}}

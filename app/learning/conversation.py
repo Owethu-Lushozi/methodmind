@@ -20,15 +20,21 @@ INTENTS = {"discover_topic", "clarify_topic", "diagnose", "simplify", "request_e
 
 
 def _practice_offer(subject: str | None, topic: str | None, history: list[dict]) -> dict | None:
-    """Only server-approved activities are offered; model text is never a tool call."""
+    """Offer only real specialist activities; avoid routing advanced maths to linear algebra."""
     student_text = " ".join(item["text"] for item in history if item["role"] == "user").lower()
+    current = next((item["text"].lower() for item in reversed(history)
+                    if item["role"] == "user"), "")
+    topic_text = (topic or "").lower()
+    advanced = r"quadratic|polynomial|x\s*\^\s*2|x²|x\*\*2|calculus|integrat|derivat|differentiat|chain rule|trigonom|matrix|matrices|simultaneous|system of equations|probability|statistics|logarithm|exponential"
+    if re.search(advanced, current) or re.search(advanced, topic_text):
+        return None
     if (subject in (None, "Life Sciences") and "photosynth" in student_text
-            and "not photosynthesis" not in student_text):
+            and "not photosynthesis" not in current):
         return {"subject_id": "biology", "activity": "guided_practice",
                 "label": "Start checked photosynthesis practice"}
     if (subject in (None, "Mathematics")
             and re.search(r"linear equation|solv(e|ing) (an? )?equation|expand(ing)? brackets|balanc(ing)? equations", student_text)
-            and not re.search(r"integrat|derivat|calculus|chain rule|substitution", student_text)):
+            and not re.search(advanced, student_text)):
         return {"subject_id": "algebra", "activity": "guided_practice",
                 "label": "Open checked linear-equation practice"}
     return None
@@ -50,6 +56,51 @@ def _student_suggestions(items: object) -> list[str]:
             continue
         result.append(choice)
     return result or ["I need a simple example", "I'm ready to try one myself"]
+
+
+
+def _topic_suggestions(message: str, topic: str | None, suggestions: list[str]) -> list[str]:
+    """Provide reliable, relevant follow-ups even when Groq omits suggestions."""
+    if suggestions:
+        return suggestions[:3]
+    focus = (message + " " + (topic or "")).lower()
+    if re.search(r"quadratic|factoris|factoriz|discriminant|x\s*\^\s*2|x²", focus):
+        return ["Show me a quadratic worked example", "Explain factoring instead", "Give me a quadratic to try"]
+    if re.search(r"chain rule|differentiat|derivative|calculus|integrat|product rule", focus):
+        if re.search(r"integrat|substitution", message.lower()):
+            return ["Show me integration by substitution", "Explain why substitution works", "Give me an integral to try"]
+        return ["Explain the chain rule simply", "Show me a differentiation example", "Give me a derivative to try"]
+    if re.search(r"linear equation|balanc(ing|e)|isolat(e|ing) x|expand.*bracket", focus):
+        return ["Show me a linear equation example", "Why do we do the same thing to both sides?", "Give me an equation to try"]
+    return suggestions[:3] or ["Explain that more simply", "Show me an example", "Give me a question to try"]
+
+
+def _stage_suggestions(message: str, reply: str, topic: str | None,
+                       suggestions: list[str]) -> list[str]:
+    """Match quick replies to the *current teaching turn*, not just the topic.
+
+    A model may return valid but stale suggestions (e.g. "try a problem" after
+    it has already given one). Only replace suggestions when the stage is clear.
+    """
+    response = reply.lower()
+    learner = message.lower()
+    # A direct exercise has already been assigned. Offer help with that
+    # exercise instead of prompting the student to request another one.
+    exercise = bool(re.search(
+        r"\b(try solving|try to solve|your turn|solve this|what is x\?|find x\?|"
+        r"what do you get\?|can you solve|give it a try|try this (?:one|problem|equation)|"
+        r"(?:equation|problem|question) (?:for you )?to solve|"
+        r"(?:solve|find|calculate)\s*(?:this|the)?\s*(?:equation|problem|value|x)\s*[:?])\b",
+        response))
+    if exercise:
+        return ["I want to try answering", "Can you give me a hint?", "Explain the first step"]
+    # When the learner submitted an answer, suggestions should support
+    # reflection or correction, not restart the lesson.
+    if re.search(r"\b(my answer is|i got|i think (?:it is|it's|x is)|x\s*=)\b", learner):
+        return ["Can you check my reasoning?", "Explain where I went wrong", "Give me another example"]
+    # Keep genuinely relevant AI suggestions for ordinary explanations and
+    # clarification turns; use the existing topic-aware fallback otherwise.
+    return _topic_suggestions(message, topic, suggestions)
 
 
 def _has_teaching(text: str) -> bool:
@@ -297,6 +348,7 @@ def send_message(conversation_id: str, message: str) -> dict:
         candidate = _fallback(message, previous)
         reply, suggestions = candidate["reply"], candidate["suggestions"]
         subject, topic, intent = candidate["subject"], candidate["topic"], candidate["intent"]
+    suggestions = _stage_suggestions(message, reply, topic, suggestions)
     with _lock:
         _purge(datetime.now(timezone.utc))
         session = _conversations.get(conversation_id)

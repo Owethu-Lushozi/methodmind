@@ -27,7 +27,7 @@
     <main class="main">
       <div class="topbar"><div><span class="tiny-circle"></span> INTERACTIVE LEARNING LAB</div><div class="topbar-right"><span class="live-dot"></span> Backend connected locally</div></div>
       <div class="content">
-        <div id="workspace-toolbar" class="workspace-toolbar" hidden><div><strong>Learning workspace</strong><span>Verified activities · Your work stays in the centre</span></div><button type="button" id="chat-panel-toggle" aria-expanded="true">Hide Mindy ◧</button></div>
+        <div id="workspace-toolbar" class="workspace-toolbar" hidden><div class="workspace-heading"><span class="workspace-heading-icon" aria-hidden="true">✦</span><div><span class="workspace-kicker">METHODMIND · VERIFIED PRACTICE</span><strong>Learning workspace</strong><span>Work through each step with Mindy by your side.</span></div></div><button type="button" id="chat-panel-toggle" aria-expanded="true">Hide Mindy ◧</button></div>
         <div class="workspace-grid"><div class="workspace-main">
         <div class="welcome-mascot" aria-hidden="true"><img src="/static/mindy.png" alt="" /></div>
         <div class="eyebrow">MEET MINDY · YOUR AI LEARNING COLLEAGUE <span>✦</span></div>
@@ -50,8 +50,8 @@
         <div class="layout" id="activity-layout">
           <section class="card ask-card">
             <div class="card-title"><span class="number">01</span><div><h2>Bring your problem</h2><p>Type any supported linear equation. No camera needed.</p></div></div>
-            <label for="subject-select">CHOOSE A SUBJECT</label>
-            <select id="subject-select" class="subject-select"><option value="algebra">Mathematics · Linear equations</option><option value="biology">Life Sciences · Photosynthesis</option></select>
+            <div class="subject-static"><span class="subject-static-icon" aria-hidden="true">∑</span><div><span class="subject-static-label">YOUR VERIFIED ACTIVITY</span><strong>Mathematics · Linear equations</strong></div><span class="subject-static-check" aria-hidden="true">✓</span></div>
+            <select id="subject-select" class="subject-select" hidden aria-label="Activity type"><option value="algebra" selected>Mathematics · Linear equations</option><option value="biology">Life Sciences · Photosynthesis</option></select>
             <form id="learning-form">
               <label for="equation">THE QUESTION</label>
               <input id="equation" name="equation" required maxlength="241" value="3(x-2)+5=17" spellcheck="false" placeholder="e.g. 3(x-2)+5=17" />
@@ -110,7 +110,11 @@
                 <div id="transfer-feedback" class="transfer-feedback" role="status" hidden></div>
                 <button type="button" id="next-transfer" class="next-button" hidden>Try the next challenge →</button>
               </div>
-              <details class="agent-log"><summary>Behind the scenes <span id="event-count">0</span> agent actions</summary><ol id="events"></ol></details>
+              <section class="agent-visual" aria-label="Agent collaboration visualisation">
+                <div class="agent-visual-head"><div><span class="agent-visual-eyebrow">✦ AGENT COLLABORATION</span><h3>Behind the scenes</h3><p>Follow how Mindy checks and improves each proposed step.</p></div><span class="agent-visual-count"><span id="event-count">0</span> actions</span></div>
+                <div id="agent-timeline" class="agent-timeline" aria-live="polite"></div>
+                <details class="agent-log"><summary>View technical event log</summary><ol id="events"></ol></details>
+              </section>
               <p class="disclaimer" id="disclaimer"></p>
             </div>
             <div id="biology-result" hidden>
