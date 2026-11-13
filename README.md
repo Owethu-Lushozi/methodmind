@@ -6,7 +6,7 @@
 
 MethodMind is a proposed autonomous learning colleague that diagnoses a student's difficulty with an algebra problem, creates a transferable learning activity, independently verifies the mathematics, revises errors, and assesses a fresh attempt.
 
-**Status: initial scaffold.** AI orchestration and mathematical validation have not yet been implemented. This repository deliberately distinguishes the intended design from working features.
+**Status: Milestone 1 mathematical checker implemented in the local update; agent orchestration is not yet implemented.** This repository deliberately distinguishes working features from planned ones.
 
 ## Planned architecture
 
@@ -42,7 +42,20 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Visit `http://127.0.0.1:8000/docs` for the API documentation. Currently the API only exposes a health check; the AI workflow is not yet available.
+Visit `http://127.0.0.1:8000/docs` for the API documentation. The `/health` and `/math/verify` endpoints work; the AI workflow is not yet available.
+
+To test the checker, open **POST /math/verify** in the API docs, click **Try it out**, and submit:
+
+```json
+{
+  "equation": "3(x-2)+5=17",
+  "proposed_answer": "5"
+}
+```
+
+It should report `is_correct: false`, with left side `14`, right side `17`, and `correct_solution: "6"`.
+
+Supported notation: numbers (including decimals), `x`, `+`, `-`, `*`, `/`, parentheses, `2x` and `3(x+1)`. Only linear equations in x are supported; exponentiation and division by x are intentionally rejected. For equations with infinitely many solutions, an individual numeric candidate may satisfy the equation even though no unique solution exists: inspect `classification` as well as `is_correct`.
 
 ```bash
 pytest
@@ -52,6 +65,7 @@ pytest
 
 - [x] Document problem, scope, agent roles, and setup
 - [x] Backend scaffold and health endpoint
+- [x] Implement strict algebra parser and deterministic solution verification
 - [ ] Implement structured agent inputs/outputs and orchestration
 - [ ] Connect an LLM securely via environment variables
 - [ ] Integrate SymPy review and bounded correction loop
