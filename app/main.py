@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from app.math_engine import MathInputError, Verification, verify_equation
+from app.agents.workflow import run_mock_learning_cycle
 
 app = FastAPI(title="MethodMind", version="0.1.0")
 
@@ -23,5 +24,18 @@ class MathVerificationRequest(BaseModel):
 def verify_math(request: MathVerificationRequest) -> Verification:
     try:
         return verify_equation(request.equation, request.proposed_answer)
+    except MathInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class LearningDemoRequest(BaseModel):
+    equation: str = Field(min_length=3, max_length=241)
+    student_attempt: str = Field(default="", max_length=1000)
+
+
+@app.post("/learning/demo")
+def learning_demo(request: LearningDemoRequest) -> dict:
+    try:
+        return run_mock_learning_cycle(request.equation, request.student_attempt)
     except MathInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

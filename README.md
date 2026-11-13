@@ -6,7 +6,7 @@
 
 MethodMind is a proposed autonomous learning colleague that diagnoses a student's difficulty with an algebra problem, creates a transferable learning activity, independently verifies the mathematics, revises errors, and assesses a fresh attempt.
 
-**Status: Milestone 1 mathematical checker implemented in the local update; agent orchestration is not yet implemented.** This repository deliberately distinguishes working features from planned ones.
+**Status: Milestone 2 mock-mode workflow implemented locally.** It demonstrates role hand-offs and a review/revision loop with deterministic sample outputs; it does not yet call a real AI model. The mathematical checker is real.
 
 ## Planned architecture
 
@@ -42,7 +42,15 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Visit `http://127.0.0.1:8000/docs` for the API documentation. The `/health` and `/math/verify` endpoints work; the AI workflow is not yet available.
+Visit `http://127.0.0.1:8000/docs` for the API documentation. The `/health` and `/math/verify` endpoints work. `/learning/demo` runs the mock workflow only.
+
+For the mock workflow, use **POST /learning/demo**:
+
+```json
+{"equation": "3(x-2)+5=17", "student_attempt": "I tried x=5"}
+```
+
+The response includes a diagnosis, a simulated incorrect teaching draft, a real SymPy verification failure, a simulated revision, and a successful re-check. The response explicitly identifies `mode: mock`. **Do not present this as live AI autonomy.**
 
 To test the checker, open **POST /math/verify** in the API docs, click **Try it out**, and submit:
 
@@ -66,6 +74,8 @@ pytest
 - [x] Document problem, scope, agent roles, and setup
 - [x] Backend scaffold and health endpoint
 - [x] Implement strict algebra parser and deterministic solution verification
+- [x] Build mock-provider workflow with separate role functions and visible review/revision log
+- [ ] Replace mock responses with real model-backed agent decisions
 - [ ] Implement structured agent inputs/outputs and orchestration
 - [ ] Connect an LLM securely via environment variables
 - [ ] Integrate SymPy review and bounded correction loop
