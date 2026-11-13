@@ -34,7 +34,7 @@
               <div class="hint">Currently supports one-variable linear equations, such as <button type="button" id="example">2(x+3)=14</button>.</div>
               <label for="attempt">WHAT HAVE YOU TRIED?</label>
               <textarea id="attempt" name="attempt" maxlength="1000" rows="5" required placeholder="Walk us through your thinking—even if you're unsure.">I tried x=5, but I don't understand why it isn't working.</textarea>
-              <div class="mode-row"><span>HOW SHOULD WE HELP?</span><label class="select-wrap"><select id="mode"><option value="coach">Guided coaching · offline</option><option value="demo">Simulated agent correction demo</option><option value="run">Live Gemini · may be unavailable</option></select></label></div>
+              <div class="mode-row"><span>HOW SHOULD WE HELP?</span><label class="select-wrap"><select id="mode"><option value="coach">Guided coaching · offline</option><option value="demo">Simulated agent correction demo</option><option value="run">Live Groq AI</option></select></label></div>
               <button class="primary" type="submit" id="submit">Explore my method <span>→</span></button>
               <p class="mode-hint" id="mode-hint">Guided coaching generates checked algebra steps and responds to the answer you entered. It does not call an LLM.</p>
             </form>
@@ -55,14 +55,25 @@
                 <div id="step-feedback" class="transfer-feedback" hidden role="status"></div>
                 <button id="step-next" class="next-button" type="button" hidden>Continue to next step →</button>
               </div>
+              <div id="concept-wrap" class="steps-wrap concept-wrap" hidden>
+                <div class="result-label">✧ &nbsp; CHECK THE REASONING</div>
+                <p id="concept-progress">Concept 1 of 2</p>
+                <p id="concept-question"></p>
+                <form id="concept-form">
+                  <div id="concept-options" class="concept-options" role="group" aria-label="Choose an explanation"></div>
+                  <button type="submit" id="concept-check" class="check-button">Check my reasoning →</button>
+                </form>
+                <div id="concept-feedback" class="transfer-feedback" role="status" hidden></div>
+                <button id="concept-next" class="next-button" type="button" hidden>Next concept →</button>
+              </div>
               <div id="transfer-wrap" class="transfer">
                 <div class="result-label">↗ &nbsp; TRY TRANSFERRING THE METHOD</div><p id="transfer"></p>
                 <small>Can you solve this one without copying the steps?</small>
                 <form id="transfer-form" class="transfer-form">
                   <label for="transfer-answer">Your value for x</label>
-                  <input id="transfer-answer" placeholder="e.g. 5" maxlength="120" required autocomplete="off" />
-                  <label for="transfer-reasoning">Why does your method work? (optional)</label>
-                  <textarea id="transfer-reasoning" rows="2" maxlength="1000" placeholder="Explain your first step..."></textarea>
+                  <input id="transfer-answer" placeholder="Enter your value for x" maxlength="120" required autocomplete="off" />
+                  <label for="transfer-reasoning">Why does your method work? (required)</label>
+                  <textarea id="transfer-reasoning" rows="3" maxlength="1000" minlength="20" required placeholder="What did you do to both sides, and why does that preserve equality?"></textarea>
                   <button class="check-button" type="submit" id="check-transfer">Check my attempt ↗</button>
                 </form>
                 <div id="transfer-feedback" class="transfer-feedback" role="status" hidden></div>

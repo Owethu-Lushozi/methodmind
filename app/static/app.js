@@ -9,12 +9,84 @@ let transferStage = 0;
 let pendingNextStage = null;
 let tutorStage = 0;
 let tutorNextStage = null;
+let stageAttemptCount = 0;
 let activeEquation = '';
+let activeTutorMode = 'coach';
+let conceptStage = 0;
+
+async function showConcept(stage) {
+  const response = await fetch(`/learning/concept/${stage}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Could not load the concept question.');
+  conceptStage = stage;
+  document.querySelector('#concept-wrap').hidden = false;
+  document.querySelector('#concept-form').hidden = false;
+  document.querySelector('#concept-next').hidden = true;
+  document.querySelector('#concept-feedback').hidden = true;
+  set('concept-progress', `Concept ${stage + 1} of 2`);
+  set('concept-question', data.question);
+  const options = document.querySelector('#concept-options');
+  options.replaceChildren();
+  data.choices.forEach((choice, index) => {
+    const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'concept-choice';
+    radio.value = String(index);
+    radio.required = true;
+    label.append(radio, document.createTextNode(choice));
+    options.appendChild(label);
+  });
+}
+
+document.querySelector('#concept-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const selected = document.querySelector('input[name="concept-choice"]:checked');
+  if (!selected) return;
+  const button = document.querySelector('#concept-check');
+  const feedback = document.querySelector('#concept-feedback');
+  button.disabled = true;
+  try {
+    const response = await fetch('/learning/concept', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({stage: conceptStage, choice: Number(selected.value)}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Could not check your reasoning.');
+    feedback.hidden = false;
+    feedback.textContent = data.feedback;
+    if (data.correct) {
+      document.querySelector('#concept-form').hidden = true;
+      if (data.complete) {
+        feedback.textContent += '\nBoth concepts checked. Now try solving a new equation independently.';
+        document.querySelector('#transfer-wrap').hidden = false;
+      } else {
+        document.querySelector('#concept-next').hidden = false;
+      }
+    }
+  } catch (error) {
+    feedback.hidden = false;
+    feedback.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.querySelector('#concept-next').addEventListener('click', async () => {
+  try { await showConcept(conceptStage + 1); }
+  catch (error) {
+    const feedback = document.querySelector('#concept-feedback');
+    feedback.hidden = false;
+    feedback.textContent = error.message;
+  }
+});
 
 function resetTutor(equation, enabled) {
   activeEquation = equation;
   tutorStage = 0;
   tutorNextStage = null;
+  stageAttemptCount = 0;
+  document.querySelector('#concept-wrap').hidden = true;
   document.querySelector('#steps-wrap').hidden = !enabled;
   document.querySelector('#step-form').hidden = false;
   document.querySelector('#step-feedback').hidden = true;
@@ -33,12 +105,41 @@ document.querySelector('#step-form').addEventListener('submit', async (event) =>
   try {
     const response = await fetch('/learning/step', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({equation: activeEquation, stage: tutorStage, submitted_equation: document.querySelector('#step-equation').value}),
+      body: JSON.stringify({
+        equation: activeEquation,
+        stage: tutorStage,
+        submitted_equation: document.querySelector('#step-equation').value,
+        coaching_mode: activeTutorMode,
+        attempt_number: Math.min(stageAttemptCount + 1, 20),
+      }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Could not check your step.');
+    if (!data.correct) stageAttemptCount = Math.min(stageAttemptCount + 1, 20);
     feedback.hidden = false;
-    feedback.textContent = data.feedback + (data.hint ? `\nHint: ${data.hint}` : '');
+    const source = data.hint_source === 'live_ai' ? 'Personalised AI hint' :
+      data.hint_source === 'symbolic_fallback' ? 'Verified offline hint (Groq unavailable)' :
+      data.hint_source === 'adaptive_scaffold' ? 'Adaptive learning support' : 'Hint';
+    const supportNotice = !data.correct && data.support_level > 1
+      ? (data.support_level === 2 ? 'Let’s focus more closely on this step.' : 'Let’s pause and try a smaller example.')
+      : '';
+    feedback.textContent = [data.feedback, supportNotice, data.hint ? `${source}: ${data.hint}` : ''].filter(Boolean).join('\n');
+    if (!data.correct && activeTutorMode === 'groq') {
+      const events = document.querySelector('#events');
+      const item = document.createElement('li');
+      const heading = document.createElement('strong');
+      heading.textContent = data.hint_source === 'live_ai'
+        ? 'adaptive teaching · respond_to_mistake: '
+        : data.hint_source === 'adaptive_scaffold' ? 'teaching · adjust_support: '
+        : 'reviewer · offline_fallback: ';
+      item.append(heading, document.createTextNode(data.hint_source === 'live_ai'
+        ? `Personalised guidance generated for step ${tutorStage + 1}.`
+        : data.hint_source === 'adaptive_scaffold'
+        ? `Switched to ${data.support_strategy} after ${stageAttemptCount} unsuccessful attempts at this step.`
+        : 'SymPy feedback remains available while Groq is unavailable.'));
+      events.appendChild(item);
+      set('event-count', String(events.children.length));
+    }
     tutorNextStage = data.next_stage;
     if (data.correct) {
       const list = document.querySelector('#revealed-steps');
@@ -51,9 +152,10 @@ document.querySelector('#step-form').addEventListener('submit', async (event) =>
       list.appendChild(item);
       document.querySelector('#step-form').hidden = true;
       if (data.complete) {
-        feedback.textContent += '\nAll three steps checked. Now try transferring the method to a different question.';
+        feedback.textContent += '\nAll three steps checked. Next, explain the ideas behind your method.';
         if (data.final_check) feedback.textContent += `\n${data.final_check}`;
-        document.querySelector('#transfer-wrap').hidden = false;
+        try { await showConcept(0); }
+        catch (error) { feedback.textContent += `\nConcept check unavailable: ${error.message}`; }
       } else {
         const next = document.querySelector('#step-next');
         next.hidden = false;
@@ -73,6 +175,7 @@ document.querySelector('#step-next').addEventListener('click', (event) => {
   if (tutorNextStage === null) return;
   tutorStage = tutorNextStage;
   tutorNextStage = null;
+  stageAttemptCount = 0;
   set('step-prompt', event.currentTarget.dataset.prompt);
   document.querySelector('#step-form').hidden = false;
   document.querySelector('#step-equation').value = '';
@@ -104,17 +207,19 @@ document.querySelector('#transfer-form').addEventListener('submit', async (event
         stage: transferStage,
         proposed_answer: document.querySelector('#transfer-answer').value,
         reasoning: document.querySelector('#transfer-reasoning').value,
+        coaching_mode: activeTutorMode,
       }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Could not check the answer.');
     feedback.hidden = false;
-    feedback.textContent = data.feedback + (data.hint ? `\nHint: ${data.hint}` : '');
+    feedback.textContent = data.feedback + (data.hint ? `\nHint: ${data.hint}` : '') +
+      (data.answer_correct ? `\nReasoning review: ${data.review_source === 'groq_with_local_guard' ? 'AI review + local safeguards' : 'Local rubric'}. This is evidence of reasoning, not proof of mastery.` : '');
     pendingNextStage = data.next_stage;
     if (data.correct) {
       document.querySelector('#transfer-form').hidden = true;
       if (data.practice_complete) {
-        feedback.textContent += '\nBoth practice questions passed. This shows successful answer transfer, but does not prove conceptual mastery.';
+        feedback.textContent += '\nBoth answers and their explanations met the current checks. That is encouraging evidence, not proof of mastery.';
       } else {
         const next = document.querySelector('#next-transfer');
         next.hidden = false;
@@ -155,7 +260,7 @@ mode.addEventListener('change', () => {
     ? 'Guided coaching generates checked algebra steps and responds to the answer you entered. It does not call an LLM.'
     : mode.value === 'demo'
     ? 'This explicitly simulated demo deliberately shows an error and correction between agents.'
-    : 'Live mode calls Gemini. Google may return 503 while capacity is limited; choose Guided coaching for reliable offline help.';
+    : 'Live mode calls GroqCloud. Free-tier capacity and rate limits apply; Guided coaching remains available offline.';
 });
 
 form.addEventListener('submit', async (event) => {
@@ -174,15 +279,19 @@ form.addEventListener('submit', async (event) => {
     empty.hidden = true;
     result.hidden = false;
     const badge = document.querySelector('#result-badge');
-    badge.textContent = data.status === 'verified' ? (data.mode === 'rule_based' ? '✓ PROBLEM CHECKED' : '✓ VERIFIED ANSWER') : (data.status || 'NEEDS INPUT').toUpperCase();
+    badge.textContent = data.status === 'verified' ?
+      (data.mode === 'rule_based' ? '✓ PROBLEM CHECKED' : data.mode === 'groq' ? '✓ AI GUIDANCE CHECKED' : '✓ VERIFIED ANSWER') :
+      (data.status || 'NEEDS INPUT').toUpperCase();
     badge.style.background = data.status === 'verified' ? '#e7f6ef' : '#fff2dc';
     badge.style.color = data.status === 'verified' ? '#22896a' : '#986524';
-    set('model-badge', data.mode === 'mock' ? 'SIMULATED DEMO' : data.mode === 'rule_based' ? 'OFFLINE COACH' : 'LIVE GEMINI');
+    set('model-badge', data.mode === 'mock' ? 'SIMULATED DEMO' : data.mode === 'rule_based' ? 'OFFLINE COACH' : 'LIVE GROQ');
     set('diagnosis', data.diagnosis || data.question || 'We need a little more of your thinking to get started.');
     set('explanation', data.explanation || 'No verified explanation is available yet.');
-    const coaching = data.mode === 'rule_based' && data.status === 'verified';
+    const coaching = ['rule_based', 'groq'].includes(data.mode) && data.status === 'verified';
+    activeTutorMode = data.mode === 'groq' ? 'groq' : 'coach';
     resetTutor(document.querySelector('#equation').value.trim(), coaching);
     document.querySelector('#transfer-wrap').hidden = !data.transfer_question || coaching;
+    document.querySelector('#concept-wrap').hidden = true;
     if (data.transfer_question) { set('transfer', data.transfer_question); resetTransfer(); }
     set('disclaimer', data.disclaimer || '');
     const events = document.querySelector('#events');
@@ -199,10 +308,11 @@ form.addEventListener('submit', async (event) => {
     empty.hidden = true;
     result.hidden = false;
     set('result-badge', 'NOT AVAILABLE');
-    set('model-badge', selectedMode === 'run' ? 'LIVE GEMINI' : selectedMode === 'coach' ? 'OFFLINE COACH' : 'SIMULATED DEMO');
+    set('model-badge', selectedMode === 'run' ? 'LIVE GROQ' : selectedMode === 'coach' ? 'OFFLINE COACH' : 'SIMULATED DEMO');
     set('diagnosis', error.message);
-    set('explanation', selectedMode === 'run' ? 'Gemini may be busy. Switch to Guided demo to explore the workflow without relying on Google.' : 'Check that your FastAPI server is running and your equation is supported.');
+    set('explanation', selectedMode === 'run' ? 'Groq may be busy or rate-limited. Switch to Guided coaching · offline to keep learning.' : 'Check that your FastAPI server is running and your equation is supported.');
     document.querySelector('#transfer-wrap').hidden = true;
+    document.querySelector('#concept-wrap').hidden = true;
     document.querySelector('#steps-wrap').hidden = true;
     document.querySelector('#events').replaceChildren();
     set('event-count', '0');
