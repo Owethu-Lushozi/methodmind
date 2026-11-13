@@ -278,6 +278,8 @@ mode.addEventListener('change', () => {
     ? 'Guided coaching generates checked algebra steps and responds to the answer you entered. It does not call an LLM.'
     : mode.value === 'demo'
     ? 'This explicitly simulated demo deliberately shows an error and correction between agents.'
+    : mode.value === 'controlled'
+    ? 'CONTROLLED LIVE DEMO: use 3(x-2)+5=17. A known wrong first step is injected; real Groq must revise it and SymPy must verify the revision. Not a spontaneous AI error.'
     : 'Live mode calls GroqCloud. Free-tier capacity and rate limits apply; Guided coaching remains available offline.';
 });
 
@@ -287,7 +289,7 @@ form.addEventListener('submit', async (event) => {
   submit.textContent = 'Thinking through your method…';
   const selectedMode = mode.value;
   try {
-    const endpoint = selectedMode === 'coach' ? '/learning/coach' : selectedMode === 'demo' ? '/learning/demo' : '/learning/run';
+    const endpoint = selectedMode === 'coach' ? '/learning/coach' : selectedMode === 'demo' ? '/learning/demo' : selectedMode === 'controlled' ? '/learning/controlled-live-correction' : '/learning/run';
     const response = await fetch(endpoint, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ equation: document.querySelector('#equation').value.trim(), student_attempt: document.querySelector('#attempt').value.trim() }),
@@ -319,7 +321,7 @@ form.addEventListener('submit', async (event) => {
       (data.status || 'NEEDS INPUT').toUpperCase();
     badge.style.background = data.status === 'verified' ? '#e7f6ef' : '#fff2dc';
     badge.style.color = data.status === 'verified' ? '#22896a' : '#986524';
-    set('model-badge', data.mode === 'mock' ? 'SIMULATED DEMO' : data.mode === 'rule_based' ? 'OFFLINE COACH' : 'LIVE GROQ');
+    set('model-badge', data.controlled_demo ? 'CONTROLLED LIVE CORRECTION · INJECTED ERROR' : data.mode === 'mock' ? 'SIMULATED DEMO' : data.mode === 'rule_based' ? 'OFFLINE COACH' : 'LIVE GROQ');
     set('diagnosis', data.diagnosis || data.question || 'We need a little more of your thinking to get started.');
     set('explanation', data.explanation || 'No verified explanation is available yet.');
     const coaching = ['rule_based', 'groq'].includes(data.mode) && data.status === 'verified';
@@ -345,7 +347,7 @@ form.addEventListener('submit', async (event) => {
     empty.hidden = true;
     result.hidden = false;
     set('result-badge', 'NOT AVAILABLE');
-    set('model-badge', selectedMode === 'run' ? 'LIVE GROQ' : selectedMode === 'coach' ? 'OFFLINE COACH' : 'SIMULATED DEMO');
+    set('model-badge', selectedMode === 'controlled' ? 'CONTROLLED LIVE DEMO' : selectedMode === 'run' ? 'LIVE GROQ' : selectedMode === 'coach' ? 'OFFLINE COACH' : 'SIMULATED DEMO');
     set('diagnosis', error.message);
     set('explanation', selectedMode === 'run' ? 'Groq may be busy or rate-limited. Switch to Guided coaching · offline to keep learning.' : 'Check that your FastAPI server is running and your equation is supported.');
     document.querySelector('#transfer-wrap').hidden = true;

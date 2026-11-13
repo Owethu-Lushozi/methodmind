@@ -93,9 +93,11 @@ def _student_answer_evidence(equation: str, student_attempt: str) -> dict | None
     }
 
 
-def run_groq_learning_cycle(equation: str, student_attempt: str) -> dict:
+def run_groq_learning_cycle(equation: str, student_attempt: str, *, controlled_demo: bool = False) -> dict:
     if not student_attempt.strip():
         return {"mode": "groq", "status": "needs_student_attempt", "question": "Show me what you have tried first.", "events": []}
+    if controlled_demo and equation.replace(" ", "") != "3(x-2)+5=17":
+        raise MathInputError("Controlled live correction demo supports only 3(x-2)+5=17.")
     original = verify_equation(equation)
     if original.classification != "unique_solution":
         raise MathInputError("Only one-variable equations with a unique solution are supported.")
@@ -154,6 +156,14 @@ def run_groq_learning_cycle(equation: str, student_attempt: str) -> dict:
         f"Equation: {equation}\n{facts}\nAttempt: {student_attempt}\nDiagnosis: {diagnosis}\nFocus: {focus}"
     )
     teaching = _ask(client, models, teaching_prompt, "teaching", events)
+    if controlled_demo:
+        # Explicit fault injection at the teaching-to-reviewer boundary.
+        # Groq still provides diagnosis and initial teaching, and MUST produce the revision.
+        # This is never used by the ordinary /learning/run endpoint.
+        teaching["first_step_equation"] = "3x+1=17"
+        events.append({"agent": "demo_controller", "action": "inject_known_error",
+                       "detail": "CONTROLLED DEMO: replaced the first teaching proposal with 3x+1=17. "
+                                 "This is an injected fault, NOT a spontaneous Groq mistake."})
     revision_count = 0
     for attempt_number in range(2):
         proposal = str(teaching.get("first_step_equation", "")).strip()
@@ -161,13 +171,34 @@ def run_groq_learning_cycle(equation: str, student_attempt: str) -> dict:
             valid = bool(check_step(equation, 0, proposal)["correct"])
         except (MathInputError, KeyError, TypeError):
             valid = False
-        events.append({"agent": "reviewer", "action": "sympy_verify_first_step", "detail": f"valid={valid}"})
+        # Trace the *actual* proposed step, not an invented demonstration.
+        # The trace is shown only in the optional behind-the-scenes section.
+        review_reason = ("The proposed equation matches the required algebra step."
+                         if valid else "The proposed equation did not pass the required symbolic step check.")
+        events.append({
+            "agent": "reviewer", "action": "sympy_verify_first_step",
+            "detail": f"attempt={attempt_number + 1}; proposed={proposal or '[empty]'}; "
+                      f"valid={valid}; reason={review_reason}",
+        })
         if valid:
+            if revision_count:
+                events.append({"agent": "orchestrator", "action": "correction_verified",
+                               "detail": "The revised step passed independent symbolic verification."})
             break
         if attempt_number == 1:
+            events.append({"agent": "orchestrator", "action": "stop_after_failed_recheck",
+                           "detail": "Both proposed steps failed independent verification; no unverified step was accepted."})
             raise ProviderUnavailable("AI's proposed algebra failed independent review. Try offline coaching.")
         revision_count += 1
-        teaching = _ask(client, models, teaching_prompt + "\nThe symbolic reviewer REJECTED the first step. Return corrected JSON.", "teaching_reviser", events)
+        events.append({"agent": "orchestrator", "action": "request_revision",
+                       "detail": "Symbolic reviewer rejected the initial proposal; requesting one corrected proposal."})
+        teaching = _ask(
+            client, models,
+            teaching_prompt + "\nThe symbolic reviewer REJECTED your proposed first step "
+            + repr(proposal) + ". Reason: " + review_reason
+            + " Return corrected JSON with a valid first_step_equation.",
+            "teaching_reviser", events,
+        )
 
     opening = str(teaching.get("opening", "")).strip()[:650]
     # Reject premature intermediate equation reveals, not just final x values.
@@ -188,10 +219,14 @@ def run_groq_learning_cycle(equation: str, student_attempt: str) -> dict:
                    "which operation went wrong without seeing your steps. "
                    "Can you expand the brackets and combine like terms first?")
     return {
-        "mode": "groq", "status": "verified", "diagnosis": diagnosis, "explanation": opening,
+        "mode": "groq", "status": "verified", "controlled_demo": controlled_demo, "diagnosis": diagnosis, "explanation": opening,
         "verified_answer": None, "transfer_question": "4(x-1)+2=18",
         "revision_count": revision_count, "events": events,
-        "disclaimer": "Groq-powered diagnostic and teaching agents generated the guidance. SymPy independently verified the proposed first step. Student steps are checked symbolically; this is not proof of mastery.",
+        "disclaimer": ("CONTROLLED LIVE CORRECTION DEMO: the initial wrong equation was deliberately injected; "
+                       "Groq generated the revision, and SymPy independently checked it. "
+                       "This is not evidence of a spontaneous model error or proof of mastery."
+                       if controlled_demo else
+                       "Groq-powered diagnostic and teaching agents generated the guidance. SymPy independently verified the proposed first step. Student steps are checked symbolically; this is not proof of mastery."),
     }
 
 

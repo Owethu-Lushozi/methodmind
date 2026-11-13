@@ -75,7 +75,7 @@ def test_correct_attempt_is_checked_regardless_of_attempt_number():
 def test_repeated_groq_attempt_does_not_make_extra_model_call(monkeypatch):
     def unexpected(*args):
         raise AssertionError('Repeated attempts must use the verified scaffold')
-    monkeypatch.setattr('app.main.generate_adaptive_step_hint', unexpected)
+    monkeypatch.setattr('app.learning.orchestrator.generate_adaptive_step_hint', unexpected)
     response = client.post('/learning/step', json={
         'equation': '3(x-2)+5=17', 'stage': 0,
         'submitted_equation': '3x-2+5=17', 'coaching_mode': 'groq',
@@ -105,7 +105,7 @@ def test_live_ai_hint_for_wrong_step(monkeypatch):
         assert submitted_equation == '3x-2+5=17'
         return 'You multiplied the first term inside the brackets. What happens to the second term?'
 
-    monkeypatch.setattr('app.main.generate_adaptive_step_hint', fake_hint)
+    monkeypatch.setattr('app.learning.orchestrator.generate_adaptive_step_hint', fake_hint)
     response = client.post('/learning/step', json={
         'equation': '3(x-2)+5=17', 'stage': 0,
         'submitted_equation': '3x-2+5=17', 'coaching_mode': 'groq',
@@ -122,7 +122,7 @@ def test_live_ai_unavailable_falls_back_to_symbolic_hint(monkeypatch):
     def unavailable(*args):
         raise ProviderUnavailable('Model busy')
 
-    monkeypatch.setattr('app.main.generate_adaptive_step_hint', unavailable)
+    monkeypatch.setattr('app.learning.orchestrator.generate_adaptive_step_hint', unavailable)
     response = client.post('/learning/step', json={
         'equation': '3(x-2)+5=17', 'stage': 0,
         'submitted_equation': '3x-2+5=17', 'coaching_mode': 'groq',
@@ -136,7 +136,7 @@ def test_correct_live_step_does_not_spend_ai_request(monkeypatch):
     def unexpected(*args):
         raise AssertionError('No AI call should be made for correct work')
 
-    monkeypatch.setattr('app.main.generate_adaptive_step_hint', unexpected)
+    monkeypatch.setattr('app.learning.orchestrator.generate_adaptive_step_hint', unexpected)
     response = client.post('/learning/step', json={
         'equation': '3(x-2)+5=17', 'stage': 0,
         'submitted_equation': '3x-1=17', 'coaching_mode': 'groq',

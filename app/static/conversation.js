@@ -8,6 +8,8 @@
   const status = document.querySelector('#conversation-status');
   const practice = document.querySelector('#conversation-practice');
   let conversationId = null;
+  let activeHistory = [];
+  let currentTitle = "New conversation";
   let pendingSubject = null;
   let linkedSubject = null;
   let syncInFlight = false;
@@ -52,6 +54,7 @@
     item.className = `conversation-bubble ${role === 'user' ? 'student' : 'assistant'}`;
     item.textContent = text;
     messages.appendChild(item);
+    if (role === "user" && currentTitle === "New conversation") { currentTitle = text.slice(0, 38); updateHistory(); }
     messages.scrollTop = messages.scrollHeight;
   }
 
@@ -80,6 +83,7 @@
       const subject = document.querySelector('#subject-select');
       subject.value = offer.subject_id;
       subject.dispatchEvent(new Event('change', {bubbles: true}));
+      window.MethodMindUI?.openWorkspace();
       const card = document.querySelector('.ask-card');
       card.scrollIntoView({behavior: 'smooth', block: 'start'});
       if (offer.subject_id === 'biology') {
@@ -93,15 +97,47 @@
     practice.appendChild(button);
   }
 
+  function updateHistory() {
+    const list = document.querySelector('#chat-history');
+    list.replaceChildren();
+    activeHistory.forEach((entry) => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'history-entry';
+      button.textContent = entry.title || 'Conversation';
+      if (entry.id === conversationId) button.classList.add('selected');
+      button.addEventListener('click', () => restore(entry.id));
+      list.appendChild(button);
+    });
+  }
+  async function restore(id) {
+    if (id === conversationId) { window.MethodMindUI?.openChat(); return; }
+    try {
+      const response = await fetch(`/conversation/${encodeURIComponent(id)}`);
+      if (!response.ok) throw new Error('This conversation is no longer available on the server.');
+      const data = await response.json();
+      conversationId = id;
+      currentTitle = activeHistory.find((x) => x.id === id)?.title || 'Conversation';
+      pendingSubject = null; linkedSubject = null;
+      messages.replaceChildren(); suggestionButtons([]); practiceOffer(null);
+      data.messages.forEach((item) => bubble(item.role, item.text));
+      updateHistory(); window.MethodMindUI?.openChat();
+      status.textContent = 'Conversation restored. Checked activity links are not restored automatically.';
+    } catch (error) { status.textContent = error.message; }
+  }
   async function start() {
     const response = await fetch('/conversation/start', {method: 'POST'});
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Conversation could not start.');
     conversationId = data.conversation_id;
+    currentTitle = 'New conversation';
+    activeHistory.unshift({id: conversationId, title: currentTitle});
+    activeHistory = activeHistory.slice(0, 15);
+    updateHistory();
     pendingSubject = null; linkedSubject = null;
     practiceOffer(null);
     messages.replaceChildren();
     data.messages.forEach((item) => bubble(item.role, item.text));
+    window.MethodMindUI?.openChat();
   }
 
   form.addEventListener('submit', async (event) => {
@@ -114,6 +150,9 @@
     practiceOffer(null);
     input.value = '';
     bubble('user', message);
+    const entry = activeHistory.find((x) => x.id === conversationId);
+    if (entry) entry.title = currentTitle;
+    updateHistory();
     status.textContent = 'MethodMind is considering your question…';
     try {
       const response = await fetch('/conversation/message', {
@@ -136,6 +175,7 @@
     }
   });
 
+  document.querySelector('#new-chat')?.addEventListener('click', () => start().catch(error => {status.textContent = error.message;}));
   start().catch((error) => {
     status.textContent = `Could not start conversation: ${error.message}. The learning activities below are still available.`;
     input.disabled = true;

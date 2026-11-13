@@ -3,31 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#111b31" />
+  <meta name="theme-color" content="#28213C" />
   <title>MethodMind · Learn the method, not just the answer</title>
   <link rel="stylesheet" href="/static/style.css" />
   <script src="/static/app.js" defer></script>
   <script src="/static/conversation.js" defer></script>
+  <script src="/static/workspace.js" defer></script>
 </head>
 <body>
   <div class="shell">
-    <aside class="sidebar">
-      <a href="/" class="brand"><span class="brand-icon">M<span class="star">✳</span></span><span>Method<span class="brand-accent">Mind</span><small>by Koa's Lab</small></span></a>
-      <div class="nav-label">YOUR WORKSPACE</div>
-      <div class="nav-item active"><span>◈</span> Learning studio</div>
-      <a class="nav-item" href="/docs" target="_blank" rel="noopener"><span>⌘</span> API documentation ↗</a>
-      <div class="sidebar-bottom"><div class="orb">✦</div><strong>Think beyond the answer.</strong><p>Turn confusion into a method you can use again.</p><span class="small-tag">HACKATHON PROTOTYPE</span></div>
+    <aside class="sidebar" aria-label="Main navigation">
+      <a href="/" class="brand"><span class="brand-icon">🧠</span><span>Method<span class="brand-accent">Mind</span><small>THINK BEYOND THE ANSWER</small></span></a>
+      <button id="new-chat" class="new-chat" type="button">＋ New conversation</button>
+      <div class="nav-label">LEARNING</div>
+      <button class="nav-item active" type="button" data-view="chat">⌂ &nbsp; Home & chat</button>
+      <button class="nav-item" type="button" data-view="workspace">▦ &nbsp; My workspace</button>
+      <button class="nav-item" type="button" data-view="activities">◇ &nbsp; Activities</button>
+      <div class="nav-label">RECENT CONVERSATIONS</div>
+      <div id="chat-history" class="chat-history" aria-label="Recent conversations"></div>
+      <div class="sidebar-bottom"><div class="orb">✦</div><strong>Learn the method.</strong><p>Not just the answer.</p><button id="theme-toggle" type="button" class="theme-toggle" aria-label="Toggle dark mode">☾ Dark mode</button></div>
     </aside>
 
     <main class="main">
       <div class="topbar"><div><span class="tiny-circle"></span> INTERACTIVE LEARNING LAB</div><div class="topbar-right"><span class="live-dot"></span> Backend connected locally</div></div>
       <div class="content">
-        <div class="eyebrow">YOUR PERSONAL LEARNING COLLEAGUE <span>✦</span></div>
-        <h1>Let's understand <em>how.</em></h1>
+        <div id="workspace-toolbar" class="workspace-toolbar" hidden><div><strong>Learning workspace</strong><span>Verified activities · Your work stays in the centre</span></div><button type="button" id="chat-panel-toggle" aria-expanded="true">Hide Mindy ◧</button></div>
+        <div class="workspace-grid"><div class="workspace-main">
+        <div class="welcome-mascot" aria-hidden="true"><img src="/static/mindy.png" alt="" /></div>
+        <div class="eyebrow">MEET MINDY · YOUR AI LEARNING COLLEAGUE <span>✦</span></div>
+        <h1>What are we <em>learning today?</em></h1>
         <p class="intro">Don't just solve this question. Learn the thinking that helps you solve the next one, too.</p>
 
         <section class="conversation-card" aria-label="Talk to MethodMind">
-          <div class="conversation-title"><span class="conversation-avatar">✦</span><div><h2>Talk to your learning colleague</h2><p>Tell me what you're studying, or where you feel stuck.</p></div><span class="conversation-label">NEW · CONVERSATION</span></div>
+          <div class="conversation-title"><span class="conversation-avatar"><img src="/static/mindy.png" alt="Mindy mascot" /></span><div><h2>Chat with Mindy</h2><p>Tell me what you're studying, or where you feel stuck.</p></div><span class="conversation-label">NEW · CONVERSATION</span></div>
           <div id="conversation-messages" class="conversation-messages" role="log" aria-live="polite" aria-label="Conversation messages"></div>
           <div id="conversation-suggestions" class="conversation-suggestions" aria-label="Suggested replies"></div>
           <div id="conversation-practice" class="conversation-practice" aria-label="Checked learning activities"></div>
@@ -36,10 +44,10 @@
             <input id="conversation-input" name="message" placeholder="e.g. I'm struggling with integration by substitution…" maxlength="1500" required autocomplete="off" />
             <button type="submit" id="conversation-send" class="conversation-send">Send →</button>
           </form>
-          <div id="conversation-status" class="conversation-status" role="status">Chat helps explore ideas. Supported checked activities can be opened below.</div>
+          <div id="conversation-status" class="conversation-status" role="status">Mindy can guide you. Only checked activities verify answers.</div>
         </section>
 
-        <div class="layout">
+        <div class="layout" id="activity-layout">
           <section class="card ask-card">
             <div class="card-title"><span class="number">01</span><div><h2>Bring your problem</h2><p>Type any supported linear equation. No camera needed.</p></div></div>
             <label for="subject-select">CHOOSE A SUBJECT</label>
@@ -50,7 +58,7 @@
               <div class="hint">Currently supports one-variable linear equations, such as <button type="button" id="example">2(x+3)=14</button>.</div>
               <label for="attempt">WHAT HAVE YOU TRIED?</label>
               <textarea id="attempt" name="attempt" maxlength="1000" rows="5" required placeholder="Walk us through your thinking—even if you're unsure.">I tried x=5, but I don't understand why it isn't working.</textarea>
-              <div class="mode-row"><span>HOW SHOULD WE HELP?</span><label class="select-wrap"><select id="mode"><option value="coach">Guided coaching · offline</option><option value="demo">Simulated agent correction demo</option><option value="run">Live Groq AI</option></select></label></div>
+              <div class="mode-row"><span>HOW SHOULD WE HELP?</span><label class="select-wrap"><select id="mode"><option value="coach">Guided coaching · offline</option><option value="demo">Simulated agent correction demo</option><option value="run">Live Groq AI</option><option value="controlled">Controlled LIVE correction · judges demo</option></select></label></div>
               <button class="primary" type="submit" id="submit">Explore my method <span>→</span></button>
               <p class="mode-hint" id="mode-hint">Guided coaching generates checked algebra steps and responds to the answer you entered. It does not call an LLM.</p>
             </form>
@@ -127,6 +135,7 @@
           </section>
         </div>
         <div class="footer-note"><span>◌</span> Built for the Colleague Zero Hackathon · Mathematical verification powered by SymPy · Learning experience in development</div>
+        </div><div class="workspace-chat-slot" id="workspace-chat-slot" aria-label="Mindy conversation panel"></div></div>
       </div>
     </main>
   </div>

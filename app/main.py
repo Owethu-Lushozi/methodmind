@@ -194,6 +194,17 @@ def learning_run(request: LearningDemoRequest) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.post("/learning/controlled-live-correction")
+def controlled_live_correction(request: LearningDemoRequest) -> dict:
+    """Clearly labelled fault injection; Groq must revise and SymPy must approve."""
+    try:
+        return run_groq_learning_cycle(request.equation, request.student_attempt, controlled_demo=True)
+    except MathInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 class TransferRequest(BaseModel):
     stage: int = Field(ge=0, le=1)
     proposed_answer: str = Field(min_length=1, max_length=120)
