@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111b31" />
+  <title>MethodMind · Learn the method, not just the answer</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a href="/" class="brand"><span class="brand-icon">M<span class="star">✳</span></span><span>Method<span class="brand-accent">Mind</span><small>by Koa's Lab</small></span></a>
+      <div class="nav-label">YOUR WORKSPACE</div>
+      <div class="nav-item active"><span>◈</span> Learning studio</div>
+      <a class="nav-item" href="/docs" target="_blank" rel="noopener"><span>⌘</span> API documentation ↗</a>
+      <div class="sidebar-bottom"><div class="orb">✦</div><strong>Think beyond the answer.</strong><p>Turn confusion into a method you can use again.</p><span class="small-tag">HACKATHON PROTOTYPE</span></div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar"><div><span class="tiny-circle"></span> INTERACTIVE LEARNING LAB</div><div class="topbar-right"><span class="live-dot"></span> Backend connected locally</div></div>
+      <div class="content">
+        <div class="eyebrow">YOUR PERSONAL LEARNING COLLEAGUE <span>✦</span></div>
+        <h1>Let's understand <em>how.</em></h1>
+        <p class="intro">Don't just solve this question. Learn the thinking that helps you solve the next one, too.</p>
+
+        <div class="layout">
+          <section class="card ask-card">
+            <div class="card-title"><span class="number">01</span><div><h2>Bring your problem</h2><p>Type any supported linear equation. No camera needed.</p></div></div>
+            <form id="learning-form">
+              <label for="equation">THE QUESTION</label>
+              <input id="equation" name="equation" required maxlength="241" value="3(x-2)+5=17" spellcheck="false" placeholder="e.g. 3(x-2)+5=17" />
+              <div class="hint">Currently supports one-variable linear equations, such as <button type="button" id="example">2(x+3)=14</button>.</div>
+              <label for="attempt">WHAT HAVE YOU TRIED?</label>
+              <textarea id="attempt" name="attempt" maxlength="1000" rows="5" required placeholder="Walk us through your thinking—even if you're unsure.">I tried x=5, but I don't understand why it isn't working.</textarea>
+              <div class="mode-row"><span>HOW SHOULD WE HELP?</span><label class="select-wrap"><select id="mode"><option value="coach">Guided coaching · offline</option><option value="demo">Simulated agent correction demo</option><option value="run">Live Gemini · may be unavailable</option></select></label></div>
+              <button class="primary" type="submit" id="submit">Explore my method <span>→</span></button>
+              <p class="mode-hint" id="mode-hint">Guided coaching generates checked algebra steps and responds to the answer you entered. It does not call an LLM.</p>
+            </form>
+          </section>
+
+          <section class="card response-card" aria-live="polite">
+            <div class="card-title"><span class="number accent">02</span><div><h2>Your learning pathway</h2><p>A little more clarity, one step at a time.</p></div></div>
+            <div id="empty" class="empty"><div class="empty-icon">✳</div><h3>Your next breakthrough starts here.</h3><p>Share a problem and your attempt. Your learning colleague will meet you where you are.</p></div>
+            <div id="result" hidden>
+              <div class="result-head"><span id="result-badge" class="result-badge">VERIFIED</span><span id="model-badge" class="model-badge">DEMO MODE</span></div>
+              <div class="result-section"><div class="result-label">◉ &nbsp; WHAT WE'RE WORKING ON</div><p id="diagnosis"></p></div>
+              <div class="result-section teaching"><div class="result-label">✦ &nbsp; LET'S THINK IT THROUGH</div><p id="explanation"></p></div>
+              <div id="transfer-wrap" class="transfer">
+                <div class="result-label">↗ &nbsp; TRY TRANSFERRING THE METHOD</div><p id="transfer"></p>
+                <small>Can you solve this one without copying the steps?</small>
+                <form id="transfer-form" class="transfer-form">
+                  <label for="transfer-answer">Your value for x</label>
+                  <input id="transfer-answer" placeholder="e.g. 5" maxlength="120" required autocomplete="off" />
+                  <label for="transfer-reasoning">Why does your method work? (optional)</label>
+                  <textarea id="transfer-reasoning" rows="2" maxlength="1000" placeholder="Explain your first step..."></textarea>
+                  <button class="check-button" type="submit" id="check-transfer">Check my attempt ↗</button>
+                </form>
+                <div id="transfer-feedback" class="transfer-feedback" role="status" hidden></div>
+                <button type="button" id="next-transfer" class="next-button" hidden>Try the next challenge →</button>
+              </div>
+              <details class="agent-log"><summary>Behind the scenes <span id="event-count">0</span> agent actions</summary><ol id="events"></ol></details>
+              <p class="disclaimer" id="disclaimer"></p>
+            </div>
+          </section>
+        </div>
+        <div class="footer-note"><span>◌</span> Built for the Colleague Zero Hackathon · Mathematical verification powered by SymPy · Learning experience in development</div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

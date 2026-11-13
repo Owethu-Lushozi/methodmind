@@ -100,3 +100,14 @@ pytest
 Never commit API keys, `.env` files, student-identifying information, or real learner data. Use synthetic examples for the hackathon demo.
 
 **Team:** Koa's Lab · **Solo developer:** Owethu Lushozi
+# Live Gemini workflow (Milestone 3)
+
+Install updated dependencies with `python -m pip install -r requirements.txt`.
+Keep `GEMINI_API_KEY=...` in your local `.env` file (never commit it).
+You may also set `GEMINI_MODEL=gemini-3.8-flash`; use a model available to your own account.
+
+POST `/learning/run` with `{"equation":"3(x-2)+5=17","student_attempt":"I tried x=5"}` for live Diagnostic, Teaching and Review agents. The independent SymPy verifier checks the final answer and asks for revisions when needed. If Gemini is overloaded, the endpoint returns HTTP 503; use `/learning/demo` for the clearly labeled simulated demonstration. This is an early prototype for single-variable equations, not a guarantee that all generated teaching explanations are correct.
+# Offline symbolic coaching (Milestone 6)
+
+POST `/learning/coach` with `{"equation":"3(x-2)+5=17","student_attempt":"I tried x=2"}`.
+This mode uses a strict algebra parser and SymPy to build valid solving steps, checks the student's proposed numeric answer by substitution, and responds to explicitly mentioned topics such as brackets, division, or signs. It does not claim to infer an unseen misconception or assess conceptual mastery. The existing `/learning/demo` remains an explicitly simulated self-correction trace, while `/learning/run` invokes live Gemini when available. On the website, select **Guided coaching · offline** to try the new functionality.
